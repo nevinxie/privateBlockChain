@@ -1,5 +1,23 @@
+/* ===== SHA256 with Crypto-js ===============================
+|  Learn more: Crypto-js: https://github.com/brix/crypto-js  |
+|  =========================================================*/
+const SHA256 = require('crypto-js/sha256')
+const level = require('level')
 
-const SHA256 = require('crypto-js/sha256');
+const chainDB = './chaindata'
+const db = level(chainDB)
+
+
+function addLevelDBData(key,value){
+  db.put(key, value, function(err) {
+    if (err) return console.log('Block ' + key + ' submission failed', err);
+  })
+}
+
+
+/* ===== Block Class ==============================
+|  Class with a constructor for block 			   |
+|  ===============================================*/
 
 
 class Block{
@@ -12,39 +30,57 @@ class Block{
     }
 }
 
+/* ===== Blockchain Class ==========================
+|  Class with a constructor for new blockchain 		|
+|  ================================================*/
 
 class Blockchain{
   constructor(){
-    this.chain = [];
-    this.addBlock(new Block("First block in the chain - Genesis block"));
+    var self = this;
+    db.get('current_block_height', function(err, value){
+      if (err){
+        if(err.notFound){
+          self.currentBlockHeight = -1;
+          self.addBlock(new Block("First block in the chain - Genesis block"));
+        }
+        return callback(err)
+      }
+      self.currentBlockHeight = parseInt(value);
+    }) 
   }
 
-  // Add new block
+  // Add new {block}
   addBlock(newBlock){
+    var self = this;
     // Block height
-    newBlock.height = this.chain.length;
+    newBlock.height = this.getBlockHeight()+1;
     // UTC timestamp
     newBlock.time = new Date().getTime().toString().slice(0,-3);
     // previous block hash
-    if(this.chain.length>0){
-      newBlock.previousBlockHash = this.chain[this.chain.length-1].hash;
+    if(newBlock.height>0){
+      newBlock.previousBlockHash = this.previousHash;
     }
     // Block hash with SHA256 using newBlock and converting to a string
     newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
+    this.previousHash = newBlock.hash;
     // Adding block object to chain
-  	this.chain.push(newBlock);
+    addLevelDBData(newBlock.height, JSON.stringify(newBlock));
+
+    db.put('current_block_height',newBlock.height)
+    .then(function(){return db.get('current_block_height')})
+    .then(function(value){self.currentBlockHeight = parseInt(value)})
+    .catch(function (err) { console.error(err) });
   }
 
   // Get block height
-    getBlockHeight(){
-      return this.chain.length-1;
-    }
+  getBlockHeight(){
+    return this.currentBlockHeight;
+  }
 
     // get block
-    getBlock(blockHeight){
-      // return object as a single string
-      return JSON.parse(JSON.stringify(this.chain[blockHeight]));
-    }
+  async getBlock(blockHeight){
+    return JSON.parse(await db.get(blockHeight));
+  }
 
     // validate block
     validateBlock(blockHeight){
@@ -72,8 +108,8 @@ class Blockchain{
         // validate block
         if (!this.validateBlock(i))errorLog.push(i);
         // compare blocks hash link
-        let blockHash = this.chain[i].hash;
-        let previousHash = this.chain[i+1].previousBlockHash;
+        let blockHash = this.getBlock(i).hash;
+        let previousHash = this.getBlock(i+1).previousBlockHash;
         if (blockHash!==previousHash) {
           errorLog.push(i);
         }
