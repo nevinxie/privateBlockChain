@@ -1,13 +1,6 @@
-/* ===== SHA256 with Crypto-js ===============================
-|  Learn more: Crypto-js: https://github.com/brix/crypto-js  |
-|  =========================================================*/
 
 const SHA256 = require('crypto-js/sha256');
 
-
-/* ===== Block Class ==============================
-|  Class with a constructor for block 			   |
-|  ===============================================*/
 
 class Block{
 	constructor(data){
@@ -19,9 +12,6 @@ class Block{
     }
 }
 
-/* ===== Blockchain Class ==========================
-|  Class with a constructor for new blockchain 		|
-|  ================================================*/
 
 class Blockchain{
   constructor(){
