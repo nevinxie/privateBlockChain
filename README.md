@@ -16,13 +16,9 @@ Installing Node and NPM is pretty straightforward using the installer package av
 ```
 npm init
 ```
-- Install crypto-js with --save flag to save dependency to our package.json file
+- Install crypto-js and level from package.json 
 ```
-npm install crypto-js --save
-```
-- Install level with --save flag
-```
-npm install level --save
+npm install
 ```
 
 ## Testing
@@ -33,16 +29,22 @@ To test code:
 ```
 node
 ```
-3: Copy and paste your code into your node session
+3: load simpleChain.js into session
+```
+.load simpleChain.js
+```
 4: Instantiate blockchain with blockchain variable
 ```
 let blockchain = new Blockchain();
 ```
-5: Generate 10 blocks using a for loop
+5: Generate 10 blocks using a for loop(addBlock is async function, so have to wrapped by async)
 ```
-for (var i = 0; i <= 10; i++) {
-  blockchain.addBlock(new Block("test data "+i));
-}
+(async function(){
+	for (var i=0; i<=10; i++){
+		await blockchain.addBlock(new Block('test data'+i))
+	}
+}())
+
 ```
 6: Validate blockchain
 ```
@@ -52,7 +54,10 @@ blockchain.validateChain();
 ```
 let inducedErrorBlocks = [2,4,7];
 for (var i = 0; i < inducedErrorBlocks.length; i++) {
-  blockchain.chain[inducedErrorBlocks[i]].data='induced chain error';
+  blockchain.getBlock(inducedErrorBlocks[i]).then(function(block){
+	block.body = 'induced chain error'
+	return db.put(block.height, JSON.stringify(block))
+  })
 }
 ```
 8: Validate blockchain. The chain should now fail with blocks 2,4, and 7.

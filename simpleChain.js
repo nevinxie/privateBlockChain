@@ -8,13 +8,6 @@ const chainDB = './chaindata'
 const db = level(chainDB)
 
 
-function addLevelDBData(key,value){
-  db.put(key, value, function(err) {
-    if (err) return console.log('Block ' + key + ' submission failed', err);
-  })
-}
-
-
 /* ===== Block Class ==============================
 |  Class with a constructor for block 			   |
 |  ===============================================*/
@@ -36,89 +29,115 @@ class Block{
 
 class Blockchain{
   constructor(){
-    var self = this;
-    db.get('current_block_height', function(err, value){
-      if (err){
-        if(err.notFound){
-          self.currentBlockHeight = -1;
+	var self = this  
+	db.get('current_block_height')
+	.then(function(value){console.log('current height is ' + value)})
+	.catch(function(err){
+		if(err.notFound){
           self.addBlock(new Block("First block in the chain - Genesis block"));
-        }
-        return callback(err)
-      }
-      self.currentBlockHeight = parseInt(value);
-    }) 
+        }	
+	})
   }
-
+  
   // Add new {block}
-  addBlock(newBlock){
-    var self = this;
-    // Block height
-    newBlock.height = this.getBlockHeight()+1;
-    // UTC timestamp
-    newBlock.time = new Date().getTime().toString().slice(0,-3);
-    // previous block hash
-    if(newBlock.height>0){
-      newBlock.previousBlockHash = this.previousHash;
-    }
-    // Block hash with SHA256 using newBlock and converting to a string
-    newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
-    this.previousHash = newBlock.hash;
-    // Adding block object to chain
-    addLevelDBData(newBlock.height, JSON.stringify(newBlock));
-
-    db.put('current_block_height',newBlock.height)
-    .then(function(){return db.get('current_block_height')})
-    .then(function(value){self.currentBlockHeight = parseInt(value)})
-    .catch(function (err) { console.error(err) });
+  async addBlock(newBlock){
+	try{
+		newBlock.height = parseInt(await db.get('current_block_height'))+1
+		console.log('new block height:'+newBlock.height)
+	}catch(error){
+		newBlock.height=0
+		console.log('starting genesis block')
+	}
+	// UTC timestamp
+	newBlock.time = new Date().getTime().toString().slice(0,-3);
+	if (newBlock.height>0){
+		newBlock.previousBlockHash = JSON.parse(await db.get(newBlock.height-1)).hash
+		console.log('prevBlockHash:'+newBlock.previousBlockHash)
+	}
+	newBlock.hash = SHA256(JSON.stringify(newBlock)).toString()
+	console.log('save block:'+JSON.stringify(newBlock))
+	await db.put(newBlock.height, JSON.stringify(newBlock))
+	console.log('save current height:'+ newBlock.height)
+	await db.put('current_block_height', newBlock.height)
   }
 
   // Get block height
-  getBlockHeight(){
-    return this.currentBlockHeight;
+  async getBlockHeight(){
+    return await db.get('current_block_height');
   }
 
-    // get block
+  // get block
   async getBlock(blockHeight){
     return JSON.parse(await db.get(blockHeight));
   }
 
     // validate block
-    validateBlock(blockHeight){
-      // get block object
-      let block = this.getBlock(blockHeight);
-      // get block hash
-      let blockHash = block.hash;
-      // remove block hash to test block integrity
-      block.hash = '';
-      // generate block hash
-      let validBlockHash = SHA256(JSON.stringify(block)).toString();
-      // Compare
-      if (blockHash===validBlockHash) {
-          return true;
-        } else {
-          console.log('Block #'+blockHeight+' invalid hash:\n'+blockHash+'<>'+validBlockHash);
-          return false;
-        }
+  async validateBlock(blockHeight){
+    // get block object
+    let block = await this.getBlock(blockHeight);
+    // get block hash
+    let blockHash = block.hash;
+    // remove block hash to test block integrity
+    block.hash = '';
+    // generate block hash
+    let validBlockHash = SHA256(JSON.stringify(block)).toString();
+    // Compare
+    if (blockHash===validBlockHash) {
+       return true;
+    } else {
+       console.log('Block #'+blockHeight+' invalid hash:\n'+blockHash+'<>'+validBlockHash);
+       return false;
     }
+  }
 
-   // Validate blockchain
-    validateChain(){
-      let errorLog = [];
-      for (var i = 0; i < this.chain.length-1; i++) {
-        // validate block
-        if (!this.validateBlock(i))errorLog.push(i);
-        // compare blocks hash link
-        let blockHash = this.getBlock(i).hash;
-        let previousHash = this.getBlock(i+1).previousBlockHash;
-        if (blockHash!==previousHash) {
-          errorLog.push(i);
-        }
-      }
-      if (errorLog.length>0) {
-        console.log('Block errors = ' + errorLog.length);
-        console.log('Blocks: '+errorLog);
-      } else {
-        console.log('No errors detected');
-      }
+  // Validate blockchain
+  async validateChain(){
+    let errorLog = [];
+	let currentBlockHeight = parseInt(await db.get('current_block_height'))
+    for (var i = 0; i < currentBlockHeight; i++) {
+      // validate block
+	  let valid = await this.validateBlock(i)
+      if (!valid)errorLog.push(i);
+      // compare blocks hash link
+	  if (i !== currentBlockHeight){
+		let blockHash = await this.getBlock(i).hash;
+		let previousHash = await this.getBlock(i+1).previousBlockHash;
+		if (blockHash!==previousHash) {
+			errorLog.push(i);
+		}    
+	  }
     }
+	//validate the current block height
+	let blockCount = await this.getBlockCountFromDB()
+	if(currentBlockHeight!=blockCount-1){
+		errorLog.push('invalid current block height, height:'+currentBlockHeight+', block count:'+blockCount)
+	}
+    if (errorLog.length>0) {
+      console.log('Block errors = ' + errorLog.length);
+      console.log('Blocks: '+errorLog);
+    } else {
+      console.log('No errors detected');
+    }
+  }
+  
+  getBlockCountFromDB(){
+	  return new Promise((resolve,reject)=>{
+			let i = 0;
+			db.createReadStream().on('data', function (data) {
+				if(data.key!=='current_block_height'){
+					//do not count item- 'current_block_height' as a block
+					i++;
+				}
+			})
+			.on('error', function (err) {
+				console.log('Error found: ', err);
+				reject(err)
+			})
+			.on('close', function () {
+				console.log('block count:'+i)
+				resolve(i);
+			}); 
+		});
+  }
+  
 }
