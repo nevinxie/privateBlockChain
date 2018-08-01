@@ -24,6 +24,7 @@ npm install
 ## Testing
 
 To test code:
+0：Remove ./chaindata folder so that the block chain can be built from scratch(data persistent is support, while expect test result had been defined with empty folder)
 1: Open a command prompt or shell terminal after install node.js.
 2: Enter a node session, also known as REPL (Read-Evaluate-Print-Loop).
 ```
@@ -41,7 +42,7 @@ let blockchain = new Blockchain();
 ```
 (async function(){
 	for (var i=0; i<=10; i++){
-		await blockchain.addBlock(new Block('test data'+i))
+		await blockchain.addBlock(new DomainObjects.Block('test data'+i))
 	}
 }())
 

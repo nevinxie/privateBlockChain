@@ -7,21 +7,7 @@ const level = require('level')
 const chainDB = './chaindata'
 const db = level(chainDB)
 
-
-/* ===== Block Class ==============================
-|  Class with a constructor for block 			   |
-|  ===============================================*/
-
-
-class Block{
-	constructor(data){
-     this.hash = "",
-     this.height = 0,
-     this.body = data,
-     this.time = 0,
-     this.previousBlockHash = ""
-    }
-}
+const DomainObjects = require('./DomainObjects.js')
 
 /* ===== Blockchain Class ==========================
 |  Class with a constructor for new blockchain 		|
@@ -34,7 +20,7 @@ class Blockchain{
 	.then(function(value){console.log('current height is ' + value)})
 	.catch(function(err){
 		if(err.notFound){
-          self.addBlock(new Block("First block in the chain - Genesis block"));
+          self.addBlock(new DomainObjects.Block("First block in the chain - Genesis block"));
         }	
 	})
   }
