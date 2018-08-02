@@ -53,7 +53,7 @@ blockchain.validateChain();
 ```
 7: Induce errors by changing block data
 ```
-let inducedErrorBlocks = [2,4,7];
+let inducedErrorBlocks = [2,4,7,11];
 for (var i = 0; i < inducedErrorBlocks.length; i++) {
   blockchain.getBlock(inducedErrorBlocks[i]).then(function(block){
 	block.body = 'induced chain error'

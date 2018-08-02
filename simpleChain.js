@@ -80,7 +80,7 @@ class Blockchain{
   async validateChain(){
     let errorLog = [];
 	let currentBlockHeight = parseInt(await db.get('current_block_height'))
-    for (var i = 0; i < currentBlockHeight; i++) {
+    for (var i = 0; i <= currentBlockHeight; i++) {
       // validate block
 	  let valid = await this.validateBlock(i)
       if (!valid)errorLog.push(i);
